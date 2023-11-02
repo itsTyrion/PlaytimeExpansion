@@ -82,8 +82,8 @@ public class PlaytimeExpansion extends PlaceholderExpansion implements Listener,
         long minutes = ((seconds % 86400) % 3600) / 60;
 
         var sb = new StringBuilder();
-        if (days > 0) sb.append(days).append(" d, ");
-        if (hours > 0) sb.append(hours).append(" h, ");
+        if (days > 0) sb.append(days).append(" d ").append(hours).append(" h ");
+        else if (hours > 0) sb.append(hours).append(" h ");
 
         return sb.append(minutes).append(" m").toString();
     }
@@ -94,8 +94,8 @@ public class PlaytimeExpansion extends PlaceholderExpansion implements Listener,
         long minutes = ((seconds % 86400) % 3600) / 60;
 
         var sb = new StringBuilder();
-        if (days > 0) sb.append(days).append(days == 1 ? " Tag, " : " Tage, ");
-        if (hours > 0) sb.append(hours).append(" Std., ");
+        if (days > 0) sb.append(days).append(days == 1 ? " Tag " : " Tage ").append(hours).append(" Std. ");
+        else if (hours > 0) sb.append(hours).append(" Std. ");
 
         return sb.append(minutes).append(" Min.").toString();
     }
