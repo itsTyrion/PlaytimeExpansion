@@ -1,0 +1,42 @@
+# User-specific stuff
+.idea/
+
+*.iml
+
+# JVM crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+
+*~
+
+# KDE directory preferences
+.directory
+
+# Linux trash folder which might appear on any partition or disk
+.Trash-*
+
+# .nfs files are created when an open file is removed but is still being accessed
+.nfs*
+
+# General
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Folder config file
+[Dd]esktop.ini
+
+target/
+
+# Maven
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+
+dependency-reduced-pom.xml
+.mvn/wrapper/maven-wrapper.jar
+.flattened-pom.xml
+
+# Gradle
+.gradle
+!gradle
