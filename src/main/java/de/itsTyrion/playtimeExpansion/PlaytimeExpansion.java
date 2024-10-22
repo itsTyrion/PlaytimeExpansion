@@ -1,5 +1,6 @@
 package de.itsTyrion.playtimeExpansion;
 
+import it.unimi.dsi.fastutil.objects.ObjectLongMutablePair;
 import me.clip.placeholderapi.expansion.Cacheable;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import me.clip.placeholderapi.expansion.Taskable;
@@ -13,24 +14,23 @@ import org.jetbrains.annotations.NotNull;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.UUID;
+import java.util.*;
 
 public class PlaytimeExpansion extends PlaceholderExpansion implements Listener, Taskable, Cacheable {
-    private static final String CHANNEL = "bungeeonlinetime:get";
+    private static final String CHANNEL_MAIN = "bungeeonlinetime:get";
+    private static final String CHANNEL_TOP = "bungeeonlinetime:top";
 
     public @NotNull String getIdentifier() {return "playtime";}
 
     public @NotNull String getAuthor() {return "itsTyrion";}
 
-    public @NotNull String getVersion() {return "1.0";}
+    public @NotNull String getVersion() {return "1.1";}
 
     @Override
     public void start() {
         Bukkit.getPluginManager().registerEvents(this, getPlaceholderAPI());
-        Bukkit.getMessenger().registerIncomingPluginChannel(getPlaceholderAPI(), CHANNEL, (channel, p, data) -> {
-            if (channel.equals(CHANNEL)) {
+        Bukkit.getMessenger().registerIncomingPluginChannel(getPlaceholderAPI(), CHANNEL_MAIN, (channel, p, data) -> {
+            if (channel.equals(CHANNEL_MAIN)) {
                 try {
                     var in = new DataInputStream(new ByteArrayInputStream(data));
                     var uuid = UUID.fromString(in.readUTF());
@@ -42,33 +42,73 @@ public class PlaytimeExpansion extends PlaceholderExpansion implements Listener,
                 }
             }
         });
+        Bukkit.getMessenger().registerIncomingPluginChannel(getPlaceholderAPI(), CHANNEL_TOP, (channel, p, data) -> {
+            if (channel.equals(CHANNEL_TOP)) {
+                try {
+                    var in = new DataInputStream(new ByteArrayInputStream(data));
+                    topPlayTime.left(in.readUTF()).right(in.readLong());
+                    in.close();
+                } catch (IOException ex) {
+                    severe("Error while receiving plugin message.", ex);
+                }
+            }
+        });
     }
 
     @Override
-    public void stop() {Bukkit.getMessenger().unregisterIncomingPluginChannel(getPlaceholderAPI(), CHANNEL);}
+    public void stop() {
+        Bukkit.getMessenger().unregisterIncomingPluginChannel(getPlaceholderAPI(), CHANNEL_MAIN);
+    }
 
     @Override
     public void clear() {playTimeMap.clear();}
 
 
     private final HashMap<UUID, Long> playTimeMap = new HashMap<>();
+    private final ObjectLongMutablePair<String> topPlayTime = ObjectLongMutablePair.of("", 0);
 
+    @Override
+    @SuppressWarnings("SpellCheckingInspection")
     public String onRequest(OfflinePlayer player, @NotNull String params) {
-        if (player == null)
-            return "";
+        var paramsLow = params.toLowerCase(Locale.ROOT);
+        return switch (paramsLow) {
+            case "topplayer" -> topPlayTime.key();
+            case "toptime" -> formatAsTime(topPlayTime.valueLong());
+            case "toptimede" -> formatAsTimeDE(topPlayTime.valueLong());
 
-        Long seconds = playTimeMap.get(player.getUniqueId());
-        if (seconds == null)
-            return "";
+            case "topplayeronline" -> playTimeMap.entrySet().stream()
+                    .max(Comparator.comparingLong(Map.Entry::getValue))
+                    .map(entry -> Bukkit.getOfflinePlayer(entry.getKey()).getName())
+                    .orElse("-");
+            case "toptimeonline" -> {
+                long time = playTimeMap.values().stream()
+                        .max(Comparator.comparingLong(x -> x))
+                        .orElse(0L);
+                yield formatAsTime(time);
+            }
+            case "toptimeonlinede" -> {
+                long time = playTimeMap.values().stream()
+                        .max(Comparator.comparingLong(x -> x))
+                        .orElse(0L);
+                yield formatAsTimeDE(time);
+            }
+            default -> {
+                if (player == null)
+                    yield "Invalid onlinetime placeholder or unit: '" + params + "'";
+                Long seconds = playTimeMap.get(player.getUniqueId());
+                if (seconds == null)
+                    yield "";
 
-        return String.valueOf(switch (params.toLowerCase(Locale.ROOT)) {
-            case "days" -> (int) (seconds / 86400L);
-            case "hours" -> (int) (seconds / 3600L);
-            case "minutes" -> (int) (seconds / 60L);
-            case "formatted" -> formatAsTime(seconds);
-            case "formattedde" -> formatAsTimeDE(seconds);
-            default -> "Invalid Unit '" + params + "'";
-        });
+                yield String.valueOf(switch (paramsLow) {
+                    case "days" -> seconds / 86400L;
+                    case "hours" -> (seconds % 86400) / 3600;
+                    case "minutes" -> (seconds % 3600) / 60;
+                    case "formatted" -> formatAsTime(seconds);
+                    case "formattedde", "formattedde2" -> formatAsTimeDE(seconds);
+                    default -> "Invalid onlinetime placeholder or unit: '" + params + "'";
+                });
+            }
+        };
     }
 
     @EventHandler
@@ -79,22 +119,22 @@ public class PlaytimeExpansion extends PlaceholderExpansion implements Listener,
     private static @NotNull String formatAsTime(long seconds) {
         long days = seconds / 86400;
         long hours = (seconds % 86400) / 3600;
-        long minutes = ((seconds % 86400) % 3600) / 60;
+        long minutes = (seconds % 3600) / 60;
 
         var sb = new StringBuilder();
-        if (days > 0) sb.append(days).append(" d ").append(hours).append(" h ");
-        else if (hours > 0) sb.append(hours).append(" h ");
+        if (days > 0) sb.append(days).append("d ").append(hours).append("h ");
+        else if (hours > 0) sb.append(hours).append("h ");
 
-        return sb.append(minutes).append(" m").toString();
+        return sb.append(minutes).append('m').toString();
     }
 
     private static @NotNull String formatAsTimeDE(long seconds) {
         long days = seconds / 86400;
         long hours = (seconds % 86400) / 3600;
-        long minutes = ((seconds % 86400) % 3600) / 60;
+        long minutes = (seconds % 3600) / 60;
 
         var sb = new StringBuilder();
-        if (days > 0) sb.append(days).append(days == 1 ? " Tag " : " Tage ").append(hours).append(" Std. ");
+        if (days > 0) sb.append(days).append(" T. ").append(hours).append(" Std. ");
         else if (hours > 0) sb.append(hours).append(" Std. ");
 
         return sb.append(minutes).append(" Min.").toString();
